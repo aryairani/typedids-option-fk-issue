@@ -22,12 +22,11 @@ package object model {
     def name = column[String]("NAME")
     def byName = createFinderBy(_.name)
 
-    def idName = id ~ name
-    def optIdName = id.? ~ name
+    def idName_* = id ~ name
+    def optIdName_* = id.? ~ name
 
-    def sortedIdName = this.map(_.idName).sortBy(_._2)
+    def sortedIdName = this.map(_.idName_*).sortBy(_._2)
   }
-
 
 
 /* Custom ID types */
@@ -61,16 +60,13 @@ package object model {
     lazy val agency: Option[Agency] = db withSession agencyId.map(Agency.byId.first)
   }
 
-  case class LoginQuery(userId: UserId, agencyId: Option[AgencyId], disabled: Boolean, inactive: Boolean)
-
   object User extends TableIdName[User,UserId]("USER") {
     def password = column[String]("PASSWORD")
     def agencyId = column[Option[AgencyId]]("COMPANY_ID")//(typeMapperToOptionTypeMapper(idMapper(AgencyId)))
     def inactive = column[Boolean]("INACTIVE", O.Default(false))
     def disabled = column[Boolean]("IS_DISABLED", O.Default(true))
 
-    def * = optIdName ~ password ~ agencyId ~ inactive ~ disabled <> (User.apply _, User.unapply _)
-    def loginQuery = id ~ agencyId ~ disabled ~ inactive <> (LoginQuery.apply _, LoginQuery.unapply _)
+    def * = optIdName_* ~ password ~ agencyId ~ inactive ~ disabled <> (User.apply _, User.unapply _)
 
     def find(name: String) = db withSession byName(name).firstOption
 
