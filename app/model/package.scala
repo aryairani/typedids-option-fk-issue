@@ -1,32 +1,10 @@
 import play.api.db.DB
 import play.api.Play.current // implicit Application
-import scala.slick.session.Database.threadLocalSession // needed for `withSession`
 import scala.slick.lifted.MappedTypeMapper
 import com.typesafe.slick.driver.oracle.OracleDriver.simple._
 
 package object model {
   def db = Database.forDataSource(DB.getDataSource())
-
-
-/* Row and Table helpers */
-  trait RowId[T <: TypedId] { def id: Option[T]}
-  trait RowName  { def name: String    }
-  trait RowIdName[T <: TypedId] extends RowId[T] with RowName
-
-  abstract class TableId[T <: TypedId : TypeMapper, R <: RowId[T]](tblName: String) extends Table[R](tblName) {
-    def id = column[T]("ID", O.PrimaryKey)
-    def byId = createFinderBy(_.id) // TODO: test me
-  }
-
-  abstract class TableIdName[R <: RowId[T], T <: TypedId : TypeMapper](tblName: String) extends TableId[T,R](tblName) {
-    def name = column[String]("NAME")
-    def byName = createFinderBy(_.name)
-
-    def idName_* = id ~ name
-    def optIdName_* = id.? ~ name
-
-    def sortedIdName = this.map(_.idName_*).sortBy(_._2)
-  }
 
 
 /* Custom ID types */
@@ -55,27 +33,26 @@ package object model {
                   password: String,
                   agencyId: Option[AgencyId] = None,
                   inactive: Boolean = false,
-                  disabled: Boolean = true
-                   ) extends RowIdName[UserId] {
-    lazy val agency: Option[Agency] = db withSession agencyId.map(Agency.byId.first)
-  }
+                  disabled: Boolean = true)
 
-  object User extends TableIdName[User,UserId]("USER") {
+  object User extends Table[User]("USER") {
+    def id = column[UserId]("ID", O.PrimaryKey)
+    def name = column[String]("NAME")
     def password = column[String]("PASSWORD")
-    def agencyId = column[Option[AgencyId]]("COMPANY_ID")//(typeMapperToOptionTypeMapper(idMapper(AgencyId)))
+    def agencyId = column[Option[AgencyId]]("AGENCY_ID")//(typeMapperToOptionTypeMapper(idMapper(AgencyId)))
     def inactive = column[Boolean]("INACTIVE", O.Default(false))
     def disabled = column[Boolean]("IS_DISABLED", O.Default(true))
 
-    def * = optIdName_* ~ password ~ agencyId ~ inactive ~ disabled <> (User.apply _, User.unapply _)
-
-    def find(name: String) = db withSession byName(name).firstOption
+    def * = id.? ~ name ~ password ~ agencyId ~ inactive ~ disabled <> (User.apply _, User.unapply _)
 
     def agency = foreignKey("FK_TB_USER_AGENCY_ID",agencyId,Agency)(_.id.?)
   }
 
-  case class Agency(id: Option[AgencyId] = None, name: String, dataOutOfDate: Boolean = false) extends RowIdName[AgencyId]
+  case class Agency(id: Option[AgencyId] = None, name: String, dataOutOfDate: Boolean = false)
 
-  object Agency extends TableIdName[Agency,AgencyId]("COMPANY") {
+  object Agency extends Table[Agency]("AGENCY") {
+    def id = column[AgencyId]("ID", O.PrimaryKey)
+    def name = column[String]("NAME")
     def dataOutOfDate = column[Boolean]("IS_DATA_OUT_OF_DATE")
     def * = id.? ~ name ~ dataOutOfDate <> (Agency.apply _, Agency.unapply _)
   }
